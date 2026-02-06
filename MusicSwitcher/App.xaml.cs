@@ -7,7 +7,6 @@ using Microsoft.Extensions.Hosting;
 using MusicSwitcher.Model;
 using MusicSwitcher.Services;
 using MusicSwitcher.ViewModel;
-using MusicSwitcher.WorkerServices;
 
 namespace MusicSwitcher
 {
@@ -61,10 +60,9 @@ namespace MusicSwitcher
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainViewModel>();
                 services.AddSingleton<MusicModel>();
-                services.AddTransient<IMusicServices, MusicServices>();
+                services.AddSingleton<IMusicServices, MusicServices>(); // Singleton для сохранения подписок на события
                 services.AddSingleton<IVolumeService, VolumeService>();
-                services.AddHostedService<MusicBackgroundServices>();
-
+                // MusicBackgroundServices больше не нужен — используем события
             });
             Host = host.Build();
             
@@ -73,6 +71,11 @@ namespace MusicSwitcher
         protected override async void OnStartup(StartupEventArgs e)
         {
             App.GetService<MainWindow>().Show();
+            
+            // Инициализация подписок на события медиа
+            var musicService = App.GetService<IMusicServices>();
+            await musicService.InitializeAsync();
+            
             await Host.StartAsync();
             
             base.OnStartup(e);

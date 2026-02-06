@@ -1,57 +1,133 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Threading;
 using Windows.Media.Control;
 using MusicSwitcher.Model;
 using System.Security.Cryptography;
-using System.Security.Policy;
+using Application = System.Windows.Application;
 
 namespace MusicSwitcher.Services
 {
-    public interface IMusicServices
+    public interface IMusicServices : IDisposable
     {
-        /// <summary>Включение следующей песни </summary>
-        public Task NextButton();
+        /// <summary>Включение следующей песни</summary>
+        Task NextButton();
 
-        /// <summary>Включение предыдущей песни </summary>
-        public Task BackButton();
-        /// <summary> Старт или остановка песни </summary>
-        public Task StartStop();
+        /// <summary>Включение предыдущей песни</summary>
+        Task BackButton();
+
+        /// <summary>Старт или остановка песни</summary>
+        Task StartStop();
+
         /// <summary>Обновление модели</summary>
-        public Task UpdateMusic();
+        Task UpdateMusic();
+
+        /// <summary>Инициализация подписок на события</summary>
+        Task InitializeAsync();
     }
 
     /// <summary>
-    /// Сервис по переключению музыки
+    /// Сервис по переключению музыки с поддержкой событий
     /// </summary>
     public class MusicServices : IMusicServices
     {
-        private GlobalSystemMediaTransportControlsSessionManager gsmtcsm;
-        private GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties;
+        private GlobalSystemMediaTransportControlsSessionManager? _sessionManager;
+        private GlobalSystemMediaTransportControlsSession? _currentSession;
+        private readonly MusicModel _musicModel;
+        private readonly Dispatcher _dispatcher;
+        private bool _disposed;
 
-        private MusicModel _musicModel;
-        public MusicServices(MusicModel _musicModel)
+        public MusicServices(MusicModel musicModel)
         {
-            GetGSMT();
-            this._musicModel= _musicModel;
-            
+            _musicModel = musicModel;
+            _dispatcher = Application.Current.Dispatcher;
+        }
+
+        /// <summary>
+        /// Инициализация менеджера и подписка на события
+        /// </summary>
+        public async Task InitializeAsync()
+        {
+            _sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+
+            // Подписка на смену текущей сессии (переключение плеера)
+            _sessionManager.CurrentSessionChanged += OnCurrentSessionChanged;
+
+            // Подписка на текущую сессию
+            SubscribeToCurrentSession();
+
+            // Первоначальное обновление
+            await UpdateMusic();
+        }
+
+        private void SubscribeToCurrentSession()
+        {
+            // Отписываемся от старой сессии
+            if (_currentSession != null)
+            {
+                _currentSession.MediaPropertiesChanged -= OnMediaPropertiesChanged;
+                _currentSession.PlaybackInfoChanged -= OnPlaybackInfoChanged;
+            }
+
+            _currentSession = _sessionManager?.GetCurrentSession();
+
+            if (_currentSession != null)
+            {
+                // Подписываемся на события новой сессии
+                _currentSession.MediaPropertiesChanged += OnMediaPropertiesChanged;
+                _currentSession.PlaybackInfoChanged += OnPlaybackInfoChanged;
+            }
+        }
+
+        private void OnCurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args)
+        {
+          //  Console.WriteLine("[Event] CurrentSessionChanged — плеер сменился");
+            SubscribeToCurrentSession();
+            InvokeOnUIThread(() => _ = UpdateMusic());
+        }
+
+        private void OnMediaPropertiesChanged(GlobalSystemMediaTransportControlsSession sender, MediaPropertiesChangedEventArgs args)
+        {
+           // Console.WriteLine("[Event] MediaPropertiesChanged — трек изменился");
+            InvokeOnUIThread(() => _ = UpdateMusic());
+        }
+
+        private void OnPlaybackInfoChanged(GlobalSystemMediaTransportControlsSession sender, PlaybackInfoChangedEventArgs args)
+        {
+          //  Console.WriteLine("[Event] PlaybackInfoChanged — статус воспроизведения изменился");
+            InvokeOnUIThread(() => _ = UpdateMusic());
+        }
+
+        /// <summary>
+        /// Выполняет действие в UI потоке
+        /// </summary>
+        private void InvokeOnUIThread(Action action)
+        {
+            if (_dispatcher.CheckAccess())
+            {
+                action();
+            }
+            else
+            {
+                _dispatcher.BeginInvoke(action);
+            }
         }
 
         public async Task NextButton()
         {
             try
             {
-                gsmtcsm = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-                var CurrSession = gsmtcsm.GetCurrentSession();
-                await CurrSession.TrySkipNextAsync();
-                await UpdateMusic();
+                var session = _sessionManager?.GetCurrentSession();
+                if (session != null)
+                {
+                    await session.TrySkipNextAsync();
+                }
             }
-            catch
+            catch (Exception e)
             {
-                return;
+                Console.WriteLine($"NextButton error: {e.Message}");
             }
         }
 
@@ -59,14 +135,15 @@ namespace MusicSwitcher.Services
         {
             try
             {
-                gsmtcsm = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-                var CurrSession = gsmtcsm.GetCurrentSession();
-                await CurrSession.TrySkipPreviousAsync();
-                await UpdateMusic();
+                var session = _sessionManager?.GetCurrentSession();
+                if (session != null)
+                {
+                    await session.TrySkipPreviousAsync();
+                }
             }
-            catch
+            catch (Exception e)
             {
-
+                Console.WriteLine($"BackButton error: {e.Message}");
             }
         }
 
@@ -74,21 +151,22 @@ namespace MusicSwitcher.Services
         {
             try
             {
-                gsmtcsm = await GetSystemMediaTransportControlsSessionManager();
-                var CurrSession = gsmtcsm.GetCurrentSession();
-                var play_back = CurrSession.GetPlaybackInfo();
-                if (play_back.PlaybackStatus.ToString() == "Paused")
+                var session = _sessionManager?.GetCurrentSession();
+                if (session == null) return;
+
+                var playback = session.GetPlaybackInfo();
+                if (playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused)
                 {
-                    await CurrSession.TryPlayAsync();
+                    await session.TryPlayAsync();
                 }
                 else
                 {
-                    await CurrSession.TryPauseAsync();
+                    await session.TryPauseAsync();
                 }
-                await UpdateMusic();
             }
-            catch
+            catch (Exception e)
             {
+                Console.WriteLine($"StartStop error: {e.Message}");
             }
         }
 
@@ -96,55 +174,76 @@ namespace MusicSwitcher.Services
         {
             try
             {
-                gsmtcsm = await GetSystemMediaTransportControlsSessionManager();
-                if (gsmtcsm.GetCurrentSession() == null)
+                var session = _sessionManager?.GetCurrentSession();
+                if (session == null)
                 {
                     await _musicModel.SetDefault();
                     return;
                 }
-                mediaProperties = await GetMediaProperties(gsmtcsm.GetCurrentSession());
-                var currSession = gsmtcsm.GetCurrentSession();
-                var playBack = currSession.GetPlaybackInfo();
-                if (_musicModel.AlbumName == mediaProperties.AlbumTitle &&
-                    _musicModel.SingName == mediaProperties.Title &&
-                    _musicModel.Status == playBack.PlaybackStatus.ToString())
-                {
 
-                }
-                else
+                var mediaProperties = await session.TryGetMediaPropertiesAsync();
+                var playback = session.GetPlaybackInfo();
+
+                // Обновляем информацию о треке если изменилась
+                if (_musicModel.AlbumName != mediaProperties.AlbumTitle ||
+                    _musicModel.SingName != mediaProperties.Title ||
+                    _musicModel.Status != playback.PlaybackStatus.ToString())
                 {
-                    await _musicModel.UpdateMusic(mediaProperties.Title, mediaProperties.AlbumTitle, mediaProperties.Artist,
-                        playBack.PlaybackStatus.ToString());
+                    await _musicModel.UpdateMusic(
+                        mediaProperties.Title,
+                        mediaProperties.AlbumTitle,
+                        mediaProperties.Artist,
+                        playback.PlaybackStatus.ToString());
                 }
-                var stream = await mediaProperties.Thumbnail.OpenReadAsync();
-                using var md5 = MD5.Create();
-                using StreamReader sr = new StreamReader(stream.AsStreamForRead());
-                using var memstream = new MemoryStream();
-                var buffer = new byte[512];
-                var bytesRead = default(int);
-                
-                while ((bytesRead = sr.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
-                    memstream.Write(buffer, 0, bytesRead);
-                var bytes = memstream.ToArray();
-                var hash = string.Join("", md5.ComputeHash(bytes));
-                if (_musicModel.HashImage != hash)
-                    await _musicModel.UpdatePicture(bytes);
-                
-                GC.Collect();
+
+                // Обновляем обложку
+                if (mediaProperties.Thumbnail != null)
+                {
+                    var stream = await mediaProperties.Thumbnail.OpenReadAsync();
+                    using var md5 = MD5.Create();
+                    using var memstream = new MemoryStream();
+
+                    var buffer = new byte[4096];
+                    var bytesRead = 0;
+                    var inputStream = stream.AsStreamForRead();
+
+                    while ((bytesRead = await inputStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        memstream.Write(buffer, 0, bytesRead);
+                    }
+
+                    var bytes = memstream.ToArray();
+                    var hash = Convert.ToBase64String(md5.ComputeHash(bytes));
+
+                    if (_musicModel.HashImage != hash)
+                    {
+                        await _musicModel.UpdatePicture(bytes);
+                    }
+                }
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine($"UpdateMusic error: {e.Message}");
             }
-           
         }
 
+        public void Dispose()
+        {
+            if (_disposed) return;
 
-        private async void GetGSMT() => gsmtcsm = await GetSystemMediaTransportControlsSessionManager();
-        private async Task<GlobalSystemMediaTransportControlsSessionManager> GetSystemMediaTransportControlsSessionManager() =>
-            await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+            if (_sessionManager != null)
+            {
+                _sessionManager.CurrentSessionChanged -= OnCurrentSessionChanged;
+            }
 
-        private async Task<GlobalSystemMediaTransportControlsSessionMediaProperties> GetMediaProperties(GlobalSystemMediaTransportControlsSession session)
-            => await session.TryGetMediaPropertiesAsync();
+            if (_currentSession != null)
+            {
+                _currentSession.MediaPropertiesChanged -= OnMediaPropertiesChanged;
+                _currentSession.PlaybackInfoChanged -= OnPlaybackInfoChanged;
+            }
+
+            _disposed = true;
+            GC.SuppressFinalize(this);
+        }
     }
 }

@@ -14,6 +14,7 @@ public class WidgetSettings
     public double WindowTop { get; set; }
     public string? BackgroundColor { get; set; }
     public string? VolumeTargetProcessName { get; set; }
+    public bool IsLocked { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

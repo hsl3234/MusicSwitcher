@@ -14,6 +14,8 @@ using MusicSwitcher.Services;
 using MusicSwitcher.ViewModel;
 using System.Windows.Forms;
 using System.Windows.Interop;
+using MenuItem = System.Windows.Controls.MenuItem;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 
 namespace MusicSwitcher
 {
@@ -95,6 +97,10 @@ namespace MusicSwitcher
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if (msg != WinApiLib.WM_NCHITTEST)
+                return IntPtr.Zero;
+
+            // Если заблокировано — не даём менять размер
+            if (_settings.IsLocked)
                 return IntPtr.Zero;
 
             long lp = lParam.ToInt64();
@@ -253,6 +259,20 @@ namespace MusicSwitcher
             };
             volumeSub.Items.Add(volumeOffItem);
             menu.Items.Insert(3, volumeSub);
+
+            // Пункт блокировки перетаскивания и изменения размера
+            var lockItem = new MenuItem
+            {
+                Header = "Заблокировать позицию",
+                IsCheckable = true,
+                IsChecked = _settings.IsLocked
+            };
+            lockItem.Click += (_, _) =>
+            {
+                _settings.IsLocked = lockItem.IsChecked;
+                _settings.Save();
+            };
+            menu.Items.Insert(4, lockItem);
         }
 
         private void OpenVolumeAppSelectWindow()
@@ -335,6 +355,7 @@ namespace MusicSwitcher
         private void Border_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left) return;
+            if (_settings.IsLocked) return; // Заблокировано — не перетаскиваем
             if (ShouldSkipDragMove(e.OriginalSource as DependencyObject))
                 return;
             try
