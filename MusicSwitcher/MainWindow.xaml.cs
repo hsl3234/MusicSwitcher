@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using MusicSwitcher.Model;
+using MusicSwitcher.Services;
 using MusicSwitcher.ViewModel;
 using System.Windows.Forms;
 using System.Windows.Interop;
@@ -24,11 +25,12 @@ namespace MusicSwitcher
         private Animation Animation { get; set; }
         private WidgetSettings _settings;
         private System.Windows.Threading.DispatcherTimer _savePositionTimer;
+        private readonly IVolumeService _volumeService;
 
-        public MainWindow(MainViewModel viewModel)
+        public MainWindow(MainViewModel viewModel, WidgetSettings settings, IVolumeService volumeService)
         {
             InitializeComponent();
-            _settings = WidgetSettings.Load();
+            _settings = settings;
 
             Opacity = Math.Clamp(_settings.Opacity, 0.3, 1.0);
             _settings.Opacity = Opacity;
@@ -61,6 +63,23 @@ namespace MusicSwitcher
             Closing += MainWindow_Closing;
             LocationChanged += MainWindow_LocationChanged;
             DataContext = viewModel;
+            _volumeService = volumeService;
+            ApplySavedBackgroundColor(viewModel);
+        }
+
+        private void ApplySavedBackgroundColor(MainViewModel viewModel)
+        {
+            if (string.IsNullOrEmpty(_settings.BackgroundColor)) return;
+            try
+            {
+                var brush = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFrom(_settings.BackgroundColor);
+                if (brush != null)
+                {
+                    viewModel.MusicModel.UserBackgroundColor = _settings.BackgroundColor;
+                    viewModel.MusicModel.WindowColor = brush;
+                }
+            }
+            catch { /* ignore invalid color */ }
         }
 
         private const int ResizeMargin = 8;
@@ -166,6 +185,7 @@ namespace MusicSwitcher
         {
             Animation = new Animation(this);
             BuildContextMenu();
+            UpdateVolumeSliderVisibility();
             Hide();
         }
 
@@ -215,6 +235,70 @@ namespace MusicSwitcher
             customItem.Click += (_, _) => OpenOpacitySliderWindow();
             opacityItem.Items.Add(customItem);
             menu.Items.Insert(1, opacityItem);
+
+            var backgroundColorItem = new MenuItem { Header = "Цвет фона…" };
+            backgroundColorItem.Click += (_, _) => OpenBackgroundColorDialog();
+            menu.Items.Insert(2, backgroundColorItem);
+
+            var volumeSub = new MenuItem { Header = "Громкость приложения" };
+            var volumeSelectItem = new MenuItem { Header = "Выбрать приложение…" };
+            volumeSelectItem.Click += (_, _) => OpenVolumeAppSelectWindow();
+            volumeSub.Items.Add(volumeSelectItem);
+            var volumeOffItem = new MenuItem { Header = "Отключить" };
+            volumeOffItem.Click += (_, _) =>
+            {
+                _settings.VolumeTargetProcessName = null;
+                _settings.Save();
+                UpdateVolumeSliderVisibility();
+            };
+            volumeSub.Items.Add(volumeOffItem);
+            menu.Items.Insert(3, volumeSub);
+        }
+
+        private void OpenVolumeAppSelectWindow()
+        {
+            var win = new VolumeAppSelectWindow(_volumeService);
+            win.Owner = this;
+            if (win.ShowDialog() == true && !string.IsNullOrEmpty(win.SelectedProcessName))
+            {
+                _settings.VolumeTargetProcessName = win.SelectedProcessName;
+                _settings.Save();
+                UpdateVolumeSliderVisibility();
+                if (DataContext is MainViewModel vm)
+                    vm.SyncVolumeFromMixer();
+            }
+        }
+
+        private void UpdateVolumeSliderVisibility()
+        {
+            var slider = FindName("VolumeSlider") as System.Windows.Controls.Slider;
+            if (slider == null) return;
+            bool show = !string.IsNullOrEmpty(_settings.VolumeTargetProcessName);
+            slider.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (show && DataContext is MainViewModel vm)
+                vm.SyncVolumeFromMixer();
+        }
+
+        private void OpenBackgroundColorDialog()
+        {
+            using var dialog = new System.Windows.Forms.ColorDialog();
+            if (DataContext is not MainViewModel vm) return;
+            if (vm.MusicModel.WindowColor is SolidColorBrush brush)
+            {
+                var c = brush.Color;
+                dialog.Color = System.Drawing.Color.FromArgb(c.A, c.R, c.G, c.B);
+            }
+            if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+            var color = dialog.Color;
+            var hex = $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
+            var wpfBrush = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFrom(hex);
+            if (wpfBrush != null)
+            {
+                vm.MusicModel.UserBackgroundColor = hex;
+                vm.MusicModel.WindowColor = wpfBrush;
+                _settings.BackgroundColor = hex;
+                _settings.Save();
+            }
         }
 
         private void UpdateOpacityMenuChecks(MenuItem opacityItem)
@@ -251,7 +335,7 @@ namespace MusicSwitcher
         private void Border_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left) return;
-            if (IsSourceButton(e.OriginalSource as DependencyObject))
+            if (ShouldSkipDragMove(e.OriginalSource as DependencyObject))
                 return;
             try
             {
@@ -263,11 +347,13 @@ namespace MusicSwitcher
             }
         }
 
-        private static bool IsSourceButton(DependencyObject? element)
+        private static bool ShouldSkipDragMove(DependencyObject? element)
         {
             while (element != null)
             {
                 if (element is System.Windows.Controls.Button)
+                    return true;
+                if (element is System.Windows.Controls.Primitives.Thumb || element is System.Windows.Controls.Slider)
                     return true;
                 element = System.Windows.Media.VisualTreeHelper.GetParent(element);
             }

@@ -94,6 +94,7 @@
                         <ColumnDefinition></ColumnDefinition>
                         <ColumnDefinition></ColumnDefinition>
                         <ColumnDefinition></ColumnDefinition>
+                        <ColumnDefinition Width="Auto" MinWidth="60"></ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <Button Command="{Binding Back}" Style="{StaticResource But}" Width="45" Height="45" Padding="5"  BorderBrush="Transparent"   Grid.Column="0" x:Name="Back">
                         <Button.Content>
@@ -149,6 +150,10 @@
                             </Grid>
                         </Button.Content>
                     </Button>
+                    <Slider x:Name="VolumeSlider" Grid.Column="3" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
+                            VerticalAlignment="Center" Margin="8,0" Width="50"
+                            Visibility="Collapsed"
+                            ToolTip="Громкость приложения"/>
                 </Grid>
 
             </Grid>

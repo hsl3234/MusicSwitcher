@@ -12,6 +12,8 @@ public class WidgetSettings
     public double Opacity { get; set; } = 1.0;
     public double WindowLeft { get; set; }
     public double WindowTop { get; set; }
+    public string? BackgroundColor { get; set; }
+    public string? VolumeTargetProcessName { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

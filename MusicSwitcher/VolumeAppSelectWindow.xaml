@@ -1,0 +1,25 @@
+<Window x:Class="MusicSwitcher.VolumeAppSelectWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Выбор приложения для громкости" Height="340" Width="380"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        WindowStyle="ToolWindow">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="Выберите приложение (микшер Windows):" Margin="0,0,0,4"/>
+        <TextBlock x:Name="EmptyHint" Grid.Row="1" Text="Включите воспроизведение в приложении (например, музыку) и нажмите «Обновить»."
+                   Margin="0,0,0,8" TextWrapping="Wrap" Foreground="Gray" Visibility="Collapsed"/>
+        <ListBox x:Name="SessionList" Grid.Row="2" DisplayMemberPath="DisplayName" Margin="0,0,0,8"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="RefreshButton" Content="Обновить" Padding="16,6" Margin="0,0,8,0" Click="Refresh_Click"/>
+            <Button Content="OK" Padding="24,6" Margin="0,0,8,0" IsDefault="True" Click="Ok_Click"/>
+            <Button Content="Отмена" Padding="24,6" IsCancel="True" Click="Cancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

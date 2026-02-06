@@ -57,10 +57,12 @@ namespace MusicSwitcher
 
             host.ConfigureServices((context, services) =>
             {
+                services.AddSingleton(WidgetSettings.Load());
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainViewModel>();
                 services.AddSingleton<MusicModel>();
                 services.AddTransient<IMusicServices, MusicServices>();
+                services.AddSingleton<IVolumeService, VolumeService>();
                 services.AddHostedService<MusicBackgroundServices>();
 
             });
