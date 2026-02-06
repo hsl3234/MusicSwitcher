@@ -1,4 +1,4 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -14,7 +14,7 @@ namespace MusicSwitcher
     /// <summary>
     /// Interaction logic for App.xaml
     /// </summary>
-    public partial class App : Application
+    public partial class App : System.Windows.Application
     {
         private IHost Host { get; set; }
 

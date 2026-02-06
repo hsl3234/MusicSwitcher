@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Metadata;
@@ -12,7 +12,9 @@ namespace MusicSwitcher
     public static class WinApiLib
     {
         public const int GWL_EXSTYLE = -20;
+        public const int GWL_STYLE = -16;
         public const int WS_EX_TOOLWINDOW = 0x00000080;
+        public const int WS_THICKFRAME = 0x00040000;
         [DllImport("user32.dll")]
         private static extern int SetWindowLong(IntPtr window, int index, int value);
 
@@ -33,6 +35,38 @@ namespace MusicSwitcher
         public static void ShoveToBackground(int hand)
         {
             WinApiLib.SetWindowPos(hand, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        }
+
+        /// <summary>
+        /// Включает изменение размера окна перетаскиванием краёв
+        /// </summary>
+        public static void EnableResize(IntPtr hwnd)
+        {
+            int style = GetWindowLong(hwnd, GWL_STYLE);
+            SetWindowLong(hwnd, GWL_STYLE, style | WS_THICKFRAME);
+        }
+
+        public const int WM_NCHITTEST = 0x0084;
+        public const int HTLEFT = 10, HTRIGHT = 11, HTTOP = 12, HTTOPLEFT = 13, HTTOPRIGHT = 14;
+        public const int HTBOTTOM = 15, HTBOTTOMLEFT = 16, HTBOTTOMRIGHT = 17;
+        public const int HTCLIENT = 1;
+
+        [DllImport("user32.dll")]
+        public static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X, Y;
+        }
+
+        [DllImport("user32.dll")]
+        public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT
+        {
+            public int Left, Top, Right, Bottom;
         }
         [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
         static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
