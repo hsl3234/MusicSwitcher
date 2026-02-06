@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Windows.Interop;
 using System.Windows;
 using System.Windows.Controls;
@@ -35,6 +35,8 @@ public class MusicModel:ReactiveObject
 
     [Reactive] public BitmapImage AlbumImage { get; set; }
     [Reactive] public Brush WindowColor { get; set; } = (SolidColorBrush)new BrushConverter().ConvertFrom("#6634384B")!;
+    /// <summary> Если задан — цвет фона не переопределяется обложкой. </summary>
+    public string? UserBackgroundColor { get; set; }
     public string HashImage { get; set; } = string.Empty;
     private static readonly BrushConverter Converter = new ();
 
@@ -49,10 +51,10 @@ public class MusicModel:ReactiveObject
             await App.Current.Dispatcher.Invoke(async delegate
             {
                 this.AlbumImage = default;
-                WindowColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#6634384B")!;
+                if (string.IsNullOrEmpty(UserBackgroundColor))
+                    WindowColor = (SolidColorBrush)new BrushConverter().ConvertFrom("#6634384B")!;
                 Icon = play;
                 Content = new View.Start();
-               
             });
 
 
@@ -91,7 +93,8 @@ public class MusicModel:ReactiveObject
         using var md5 = MD5.Create();
         HashImage = string.Join("", md5.ComputeHash(file));
         this.AlbumImage = ConvertImage.ToBitmapImage(file);
-        WindowColor = await ConvertImage.GetColor(AlbumImage);
+        if (string.IsNullOrEmpty(UserBackgroundColor))
+            WindowColor = await ConvertImage.GetColor(AlbumImage);
     }
     private BitmapImage play = new BitmapImage(new Uri("pack://application:,,,/MusicSwitcher;component/Resources/play-button.ico"));
 

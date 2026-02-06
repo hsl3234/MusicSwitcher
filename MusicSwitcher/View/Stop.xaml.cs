@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,7 +18,7 @@ namespace MusicSwitcher.View
     /// <summary>
     /// Логика взаимодействия для Stop.xaml
     /// </summary>
-    public partial class Stop : UserControl
+    public partial class Stop : System.Windows.Controls.UserControl
     {
         public Stop()
         {

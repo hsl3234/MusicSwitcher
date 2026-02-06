@@ -1,4 +1,4 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -14,7 +14,7 @@ namespace MusicSwitcher
     /// <summary>
     /// Interaction logic for App.xaml
     /// </summary>
-    public partial class App : Application
+    public partial class App : System.Windows.Application
     {
         private IHost Host { get; set; }
 
@@ -57,10 +57,12 @@ namespace MusicSwitcher
 
             host.ConfigureServices((context, services) =>
             {
+                services.AddSingleton(WidgetSettings.Load());
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainViewModel>();
                 services.AddSingleton<MusicModel>();
                 services.AddTransient<IMusicServices, MusicServices>();
+                services.AddSingleton<IVolumeService, VolumeService>();
                 services.AddHostedService<MusicBackgroundServices>();
 
             });

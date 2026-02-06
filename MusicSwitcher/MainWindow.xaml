@@ -1,10 +1,12 @@
-﻿<Window x:Class="MusicSwitcher.MainWindow"
+<Window x:Class="MusicSwitcher.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MusicSwitcher"
         WindowStyle="None"
+        ResizeMode="CanResize"
+        MinWidth="280" MinHeight="120"
         xmlns:viewModel="clr-namespace:MusicSwitcher.ViewModel"
         d:DataContext="{d:DesignInstance Type=viewModel:MainViewModel}"
         mc:Ignorable="d"
@@ -24,7 +26,10 @@
         </ResourceDictionary>
        
     </Window.Resources>
-    <Border  x:Name="Border" CornerRadius="15" Background="{Binding MusicModel.WindowColor}" >
+    <Border x:Name="Border" CornerRadius="15" Background="{Binding MusicModel.WindowColor}"
+        ContextMenu="{StaticResource Menu}"
+        ContextMenuOpening="Border_ContextMenuOpening"
+        PreviewMouseLeftButtonDown="Border_PreviewMouseLeftButtonDown">
         <Grid>
 
             
@@ -89,6 +94,7 @@
                         <ColumnDefinition></ColumnDefinition>
                         <ColumnDefinition></ColumnDefinition>
                         <ColumnDefinition></ColumnDefinition>
+                        <ColumnDefinition Width="Auto" MinWidth="60"></ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <Button Command="{Binding Back}" Style="{StaticResource But}" Width="45" Height="45" Padding="5"  BorderBrush="Transparent"   Grid.Column="0" x:Name="Back">
                         <Button.Content>
@@ -144,6 +150,10 @@
                             </Grid>
                         </Button.Content>
                     </Button>
+                    <Slider x:Name="VolumeSlider" Grid.Column="3" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
+                            VerticalAlignment="Center" Margin="8,0" Width="50"
+                            Visibility="Collapsed"
+                            ToolTip="Громкость приложения"/>
                 </Grid>
 
             </Grid>
